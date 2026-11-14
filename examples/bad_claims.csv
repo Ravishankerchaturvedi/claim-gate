@@ -1,0 +1,4 @@
+claim,evidence_url,evidence_quote,checked_at
+"Bad URL claim.","ftp://example.com/page","some quote","2026-10-29"
+"Empty quote claim.","https://www.python.org/","","2026-10-29"
+"Old date claim.","https://www.python.org/","Python is a programming language that lets you work quickly and integrate systems more effectively.","2020-01-01"
