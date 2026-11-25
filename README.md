@@ -5,12 +5,13 @@
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
 
-**Block hallucinated facts before they reach a prospect.** claim-gate fails any row in a CSV that lacks a source
+**Block hallucinated facts before they reach a prospect.** claim-gate fails any row in a CSV, JSON or JSONL list that lacks a source
 URL, an exact quote and a fresh check date, and with `--live` it confirms each quote is really on the page. A pass
 is bound to the file's sha256, so editing the list after the check invalidates it.
 
 Use it for sales and marketing lists, lead research, and any AI agent or LLM pipeline that writes facts about real
-companies. No dependencies; standard library only.
+companies — LLM pipelines can hand the gate their JSON or JSONL output directly, no conversion step. No
+dependencies; standard library only.
 
 ## Problem
 
@@ -29,19 +30,30 @@ claim-gate check examples/claims.csv --max-age-days 3650
 claim-gate verify examples/claims.csv
 ```
 
+JSON and JSONL are read the same way, chosen by file extension — no conversion step for LLM output:
+
+```bash
+claim-gate check examples/claims.json --max-age-days 3650
+claim-gate check examples/claims.jsonl --max-age-days 3650
+```
+
 Live check (fetches each URL, one request every 2 seconds):
 
 ```bash
 claim-gate check examples/claims.csv --live --max-age-days 3650
 ```
 
-Real output of the quickstart above (run on 2026-10-30):
+Real output of the quickstart above (run on 2026-11-25):
 
 ```
 $ claim-gate check examples/claims.csv --max-age-days 3650
 PASS -> examples/GATE_PASS.json
 $ claim-gate verify examples/claims.csv
-PASS: CSV matches gate pass
+PASS: input file matches gate pass
+$ claim-gate check examples/claims.json --max-age-days 3650
+PASS -> examples/GATE_PASS.json
+$ claim-gate check examples/claims.jsonl --max-age-days 3650
+PASS -> examples/GATE_PASS.json
 $ claim-gate check examples/claims.csv --live --max-age-days 3650
 PASS -> examples/GATE_PASS.json
 ```
@@ -59,7 +71,7 @@ row 3: checked_at is older than 30 days
 
 ## How it works
 
-Reads the CSV with `csv.DictReader`, checks required columns from config (default: claim, evidence_url, evidence_quote, checked_at), validates each row (non-empty claim, http(s) URL, non-empty quote, valid ISO date within max age), optionally fetches each URL and confirms the normalised quote appears on the page, then writes `GATE_PASS.json` with the file's sha256 and row count. `verify` re-checks the sha256 so a changed CSV invalidates the pass.
+Reads CSV (with `csv.DictReader`), JSON (a top-level array of row objects, or an object holding the array under `rows`, `claims`, `data` or `items`) or JSONL/NDJSON (one object per line), chosen by file extension. It checks the required columns from config (default: claim, evidence_url, evidence_quote, checked_at) and validates each row (non-empty claim, http(s) URL, non-empty quote, valid ISO date within max age; a missing JSON field counts as empty). It optionally fetches each URL and confirms the normalised quote appears on the page, then writes `GATE_PASS.json` with the input file's sha256 and row count. `verify` re-checks the sha256 so a changed file invalidates the pass. Malformed JSON is bad input (exit 2), not a row failure.
 
 ## Configuration
 
@@ -77,15 +89,17 @@ Columns may be renamed; roles are taken by position (claim, URL, quote, date).
 
 ## Use it with AI agents
 
-Put claim-gate after any LLM step that writes claims, and before anything is sent or published:
+Put claim-gate after any LLM step that writes claims, and before anything is sent or published. LLM pipelines that
+emit JSON or JSONL can pipe their file straight in:
 
 ```bash
-claim-gate check leads.csv --live && claim-gate verify leads.csv && send_the_list leads.csv
+claim-gate check leads.jsonl --live && claim-gate verify leads.jsonl && send_the_list leads.jsonl
 ```
 
-- Exit code `0` = pass, `1` = a row failed (reasons are printed per row), `2` = bad input (for example a missing file).
-- The pass file (`GATE_PASS.json`) records the CSV's sha256, the row count and the check time; `verify` refuses a
-  changed file.
+- Exit code `0` = pass, `1` = a row failed (reasons are printed per row), `2` = bad input (for example a missing
+  file or malformed JSON).
+- The pass file (`GATE_PASS.json`) records the input file's sha256, the row count and the check time; `verify`
+  refuses a changed file.
 - The repo ships a `SKILL.md`, so coding agents that read skills (for example Claude Code) can run the gate
   themselves.
 
@@ -94,6 +108,7 @@ claim-gate check leads.csv --live && claim-gate verify leads.csv && send_the_lis
 - Offline checks validate shape and freshness only; `--live` confirms the quote appears on the page after normalising whitespace and HTML.
 - No JavaScript rendering; logged-out pages only.
 - One request per 2 seconds during `--live`.
+- JSON input must be an array of row objects, or an object holding that array under `rows`, `claims`, `data` or `items`; JSONL is one object per line. A missing field counts as empty and fails.
 - Examples in `examples/claims.csv` are real quotes verified live on 2026-10-29.
 
 ## About

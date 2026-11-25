@@ -85,29 +85,30 @@ def validate_rows(rows, required, max_age_days, live=False, fetcher=None):
         for col in required or []:
             if col in handled:
                 continue
-            val = (row.get(col) or "").strip() if isinstance(row, dict) else ""
+            val = str(row.get(col) or "").strip() if isinstance(row, dict) else ""
             if not val:
                 failures.append((idx, "%s is empty" % col))
 
-        if claim_col and isinstance(row, dict) and claim_col in row:
-            claim = (row.get(claim_col) or "").strip()
+        # a missing field (JSON rows) counts as empty, like a blank CSV cell
+        if claim_col and isinstance(row, dict):
+            claim = str(row.get(claim_col) or "").strip()
             if not claim:
                 failures.append((idx, "%s is empty" % claim_col))
 
-        if url_col and isinstance(row, dict) and url_col in row:
-            url = (row.get(url_col) or "").strip()
+        if url_col and isinstance(row, dict):
+            url = str(row.get(url_col) or "").strip()
             if not url:
                 failures.append((idx, "%s is empty" % url_col))
             elif not is_http_url(url):
                 failures.append((idx, "%s is not an http(s) URL" % url_col))
 
-        if quote_col and isinstance(row, dict) and quote_col in row:
-            quote = (row.get(quote_col) or "").strip()
+        if quote_col and isinstance(row, dict):
+            quote = str(row.get(quote_col) or "").strip()
             if not quote:
                 failures.append((idx, "%s is empty" % quote_col))
 
-        if date_col and isinstance(row, dict) and date_col in row:
-            checked_raw = (row.get(date_col) or "").strip()
+        if date_col and isinstance(row, dict):
+            checked_raw = str(row.get(date_col) or "").strip()
             if not checked_raw:
                 failures.append((idx, "%s is empty" % date_col))
             else:
@@ -130,9 +131,9 @@ def file_sha256(path):
     return h.hexdigest()
 
 
-def write_pass(path, csv_path, rows):
+def write_pass(path, input_path, rows):
     doc = {
-        "csv_sha256": file_sha256(csv_path),
+        "file_sha256": file_sha256(input_path),
         "rows": rows,
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }

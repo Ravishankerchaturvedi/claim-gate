@@ -1,0 +1,20 @@
+[
+  {
+    "claim": "Python is a programming language that lets you work quickly and integrate systems more effectively.",
+    "evidence_url": "https://www.python.org/",
+    "evidence_quote": "Python is a programming language that lets you work quickly and integrate systems more effectively.",
+    "checked_at": "2026-10-29"
+  },
+  {
+    "claim": "The Zen of Python says readability counts.",
+    "evidence_url": "https://peps.python.org/pep-0020/",
+    "evidence_quote": "Readability counts.",
+    "checked_at": "2026-10-29"
+  },
+  {
+    "claim": "The built-in len() returns the length of an object.",
+    "evidence_url": "https://docs.python.org/3/library/functions.html",
+    "evidence_quote": "Return the length (the number of items) of an object.",
+    "checked_at": "2026-10-29"
+  }
+]

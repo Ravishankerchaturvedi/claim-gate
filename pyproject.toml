@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claim-gate"
-version = "0.1.0"
-description = "Block hallucinated facts before they ship: every claim in a CSV needs a source URL, an exact quote and a fresh check date."
+version = "0.1.1"
+description = "Block hallucinated facts before they ship: every claim in a CSV, JSON or JSONL list needs a source URL, an exact quote and a fresh check date."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Ravi Shanker Chaturvedi" }]
-keywords = ["fact-checking", "hallucination", "llm", "ai-agents", "guardrails", "grounding", "claim-verification", "evidence", "data-quality", "sales-intelligence", "lead-generation", "csv", "cli", "python"]
+keywords = ["fact-checking", "hallucination", "llm", "ai-agents", "guardrails", "grounding", "claim-verification", "evidence", "data-quality", "sales-intelligence", "lead-generation", "csv", "jsonl", "cli", "python"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Environment :: Console",

@@ -27,7 +27,7 @@ def test_offline_pass():
     assert PASS_FILE.exists()
     doc = json.loads(PASS_FILE.read_text())
     assert doc["rows"] == 3
-    assert doc["csv_sha256"] == hashlib.sha256(CLAIMS.read_bytes()).hexdigest()
+    assert doc["file_sha256"] == hashlib.sha256(CLAIMS.read_bytes()).hexdigest()
     if PASS_FILE.exists():
         PASS_FILE.unlink()
 
@@ -160,4 +160,106 @@ def test_renamed_columns_config():
         assert "http" in out.lower()
         assert "empty" in out.lower()
         assert "ISO date" in out or "iso date" in out.lower()
+
+
+def test_json_input_pass_and_verify(tmp_path):
+    from datetime import date
+    claims = tmp_path / "claims.json"
+    claims.write_text(json.dumps([
+        {"claim": "c1", "evidence_url": "https://example.com", "evidence_quote": "q",
+         "checked_at": date.today().isoformat()},
+        {"claim": "c2", "evidence_url": "https://example.com/x", "evidence_quote": "q2",
+         "checked_at": date.today().isoformat()},
+    ]), encoding="utf-8")
+    pass_file = tmp_path / "GATE_PASS.json"
+    r = run("check", str(claims), "--out", str(pass_file))
+    assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
+    doc = json.loads(pass_file.read_text())
+    assert doc["rows"] == 2
+    assert doc["file_sha256"] == hashlib.sha256(claims.read_bytes()).hexdigest()
+    r = run("verify", str(claims), "--pass-file", str(pass_file))
+    assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
+    assert "input file matches gate pass" in r.stdout
+
+
+def test_jsonl_input_pass_and_fail(tmp_path):
+    from datetime import date
+    today = date.today().isoformat()
+    good = tmp_path / "claims.jsonl"
+    good.write_text(
+        json.dumps({"claim": "c1", "evidence_url": "https://example.com", "evidence_quote": "q",
+                    "checked_at": today}) + "\n"
+        + json.dumps({"claim": "c2", "evidence_url": "https://example.com/2", "evidence_quote": "q2",
+                      "checked_at": today}) + "\n",
+        encoding="utf-8")
+    r = run("check", str(good), "--out", str(tmp_path / "p.json"))
+    assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
+    assert json.loads((tmp_path / "p.json").read_text())["rows"] == 2
+    # one bad row fails the whole file, reasons printed per row
+    bad = tmp_path / "bad.jsonl"
+    bad.write_text(
+        json.dumps({"claim": "c1", "evidence_url": "not-a-url", "evidence_quote": "q",
+                    "checked_at": today}) + "\n"
+        + json.dumps({"claim": "c2", "evidence_url": "https://example.com", "evidence_quote": "",
+                      "checked_at": today}) + "\n",
+        encoding="utf-8")
+    r = run("check", str(bad))
+    assert r.returncode == 1, (r.returncode, r.stdout, r.stderr)
+    out = r.stdout + r.stderr
+    assert "not an http(s) URL" in out
+    assert "evidence_quote is empty" in out
+    # a malformed line is bad input, not a row failure
+    broken = tmp_path / "broken.jsonl"
+    broken.write_text('{"claim": "c"}\nnot json\n', encoding="utf-8")
+    r = run("check", str(broken))
+    assert r.returncode == 2, (r.returncode, r.stdout, r.stderr)
+    assert "line 2 is not valid JSON" in (r.stdout + r.stderr)
+
+
+def test_json_container_shapes_and_errors(tmp_path):
+    from datetime import date
+    today = date.today().isoformat()
+    row = {"claim": "c", "evidence_url": "https://example.com", "evidence_quote": "q",
+           "checked_at": today}
+    wrapped = tmp_path / "wrapped.json"
+    wrapped.write_text(json.dumps({"claims": [row]}), encoding="utf-8")
+    r = run("check", str(wrapped), "--out", str(tmp_path / "p.json"))
+    assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
+    # an object without a known list key is bad input
+    plain = tmp_path / "plain.json"
+    plain.write_text(json.dumps({"note": "no rows here"}), encoding="utf-8")
+    r = run("check", str(plain))
+    assert r.returncode == 2, (r.returncode, r.stdout, r.stderr)
+    assert "bad input" in (r.stdout + r.stderr)
+    # malformed JSON is bad input
+    broken = tmp_path / "broken.json"
+    broken.write_text("{not json", encoding="utf-8")
+    r = run("check", str(broken))
+    assert r.returncode == 2, (r.returncode, r.stdout, r.stderr)
+    # a row that is not an object is bad input
+    scalar = tmp_path / "scalar.json"
+    scalar.write_text("[1, 2]", encoding="utf-8")
+    r = run("check", str(scalar))
+    assert r.returncode == 2, (r.returncode, r.stdout, r.stderr)
+    assert "not a JSON object" in (r.stdout + r.stderr)
+
+
+def test_json_missing_field_fails_as_empty(tmp_path):
+    from datetime import date
+    p = tmp_path / "claims.json"
+    p.write_text(json.dumps([
+        {"claim": "c", "evidence_url": "https://example.com",
+         "checked_at": date.today().isoformat()},
+    ]), encoding="utf-8")
+    r = run("check", str(p))
+    assert r.returncode == 1, (r.returncode, r.stdout, r.stderr)
+    assert "evidence_quote is empty" in (r.stdout + r.stderr)
+
+
+def test_unsupported_extension_rejected(tmp_path):
+    p = tmp_path / "claims.xlsx"
+    p.write_text("not really a spreadsheet", encoding="utf-8")
+    r = run("check", str(p))
+    assert r.returncode == 2, (r.returncode, r.stdout, r.stderr)
+    assert "unsupported input file type" in (r.stdout + r.stderr)
 PY
